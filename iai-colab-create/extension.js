@@ -1,7 +1,10 @@
 // The module 'vscode' contains the VS Code extensibility API
 // Import the module and reference it with the alias vscode in your code below
 const vscode = require('vscode');
-
+const {
+	Configuration,
+	OpenAIApi
+} = require("openai");
 // This method is called when your extension is activated
 // Your extension is activated the very first time the command is executed
 
@@ -9,20 +12,40 @@ const vscode = require('vscode');
  * @param {vscode.ExtensionContext} context
  */
 function activate(context) {
-
-	// Use the console to output diagnostic information (console.log) and errors (console.error)
-	// This line of code will only be executed once when your extension is activated
-	console.log('Congratulations, your extension "iai-colab-create" is now active!');
-
-	// The command has been defined in the package.json file
-	// Now provide the implementation of the command with  registerCommand
-	// The commandId parameter must match the command field in package.json
-	let disposable = vscode.commands.registerCommand('iai-colab-create.helloWorld', function () {
-		// The code you place here will be executed every time your command is executed
-
-		// Display a message box to the user
-		vscode.window.showInformationMessage('Hello World from iai-colab-create!');
+	// configure OpenAI api
+	const configuration = new Configuration({
+		apiKey: "sk-putYourApiKeyHere",
 	});
+	const openai = new OpenAIApi(configuration);
+
+	let disposable = vscode.commands.registerCommand('iai-colab-create.sendGPTQuery', async () => {
+		try {
+			//display input box
+			const query = await vscode.window.showInputBox({
+				prompt: 'Enter your query'
+			});
+
+			//send api request to openai
+			const completion = await openai.createCompletion({
+				model: "text-davinci-003",
+				prompt: query,
+				max_tokens: 10
+			}, {
+				timeout: 1000
+			});
+
+			//print results
+			console.log(completion.data.choices[0].text);
+		} catch (error) {
+			if (error.response) {
+				console.log(error.response.status);
+				console.log(error.response.data);
+			} else {
+				console.log(error.message);
+			}
+		}
+	});
+
 
 	context.subscriptions.push(disposable);
 }
