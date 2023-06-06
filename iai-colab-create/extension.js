@@ -27,97 +27,83 @@ function activate(context) {
   let disposable = vscode.commands.registerCommand(
     "iai-colab-create.askGPT",
     async function () {
-      // The code you place here will be executed every time your command is executed
-      const prompt = await vscode.window.showInputBox({
-        prompt: "Enter your prompt: ",
-      });
-      if (!prompt) {
-        return;
-      }
-
-      console.log(prompt);
-
-      try {
-        const response = await openai.createChatCompletion({
-          model: "gpt-3.5-turbo",
-          messages: [{ role: "user", content: prompt }],
-        });
-        console.log(response);
-        const generatedText = response.data.choices[0].message.content;
-        vscode.window.showInformationMessage(generatedText);
-
-        // separate between text and code lines
-
-        // paste the answer to the notebook
-        let nb = {
-          metadata: { name: "Test 1" },
-          cells: [
-            {
-              cell_type: "markdown",
-              metadata: {},
-              source: generatedText,
-            },
-          ],
-          nbformat: 4,
-          nbformat_minor: 4,
-        };
-
-        // TODO: Fix the path
-        // Save the notebook to disk
-        let notebookPath = `...`;
-        // if (workspaceFolders) {
-        //   notebookPath = `${workspaceFolders[0].uri.path}/Untitled.ipynb`;
-        // } else {
-        //   // Use a default path if workspaceFolders is not found
-        //   notebookPath = `${vscode.env.appName}/Untitled.ipynb`;
-        // }
-
-        let notebookContents = JSON.stringify(nb);
-        await vscode.workspace.fs.writeFile(
-          vscode.Uri.file(notebookPath),
-          Buffer.from(notebookContents)
-        );
-
-        // Open the new notebook in a VS Code editor
-        let notebookUri = vscode.Uri.file(notebookPath);
-        let notebookEditor = await vscode.window.showNotebookDocument(
-          notebookUri,
-          {
-            viewColumn: vscode.ViewColumn.Active,
-          }
-        );
-        const editor = vscode.window.activeNotebookEditor;
-        if (!editor) {
-          let notebookDocument = await vscode.workspace.openNotebookDocument(
-            "jupyter-notebook"
-          );
-          editor = await vscode.window.showNotebookDocument(notebookDocument);
-          let cell = notebookDocument.createCell("markdown", "New cell");
-          notebookDocument.cells = [cell];
-        }
-
-        let content = editor.document.getText();
-        let notebook = nbformat.reads(content, nbformat.NO_CONVERT);
-        let new_cell = nbformat.createMarkdownCell(generatedText);
-        notebook.cells.push(new_cell);
-
-        let newContent = nbformat.writes(notebook, nbformat.nO_CONVERT);
-        editor.edit((builder) => {
-          let documentStart = new vscode.Position(0, 0);
-          let documentEnd = new vscode.Position(editor.document.lineCount, 0);
-          let documentRange = new vscode.Range(documentStart, documentEnd);
-          builder.replace(documentRange, newContent);
-        });
-      } catch (error) {
-        console.error(error);
-        vscode.window.showErrorMessage(
-          "An error occurred while generating text."
-        );
+      // Get the active notebook document or create a new one if none is active
+      let notebook = vscode.window.activeNotebookEditor?.document;
+      if (!notebook) {
+          vscode.window.showNotebookDocument({ viewColumn: vscode.ViewColumn.One }).then(newNotebook => {
+              notebook = newNotebook;
+              handleNotebookDocument(notebook);
+          }).catch(err => {
+              vscode.window.showErrorMessage('Failed to create a new notebook document: ' + err);
+          });
+      } else {
+          handleNotebookDocument(notebook);
       }
     }
   );
 
   context.subscriptions.push(disposable);
+}
+
+function handleNotebookDocument(notebook) {
+  // The code you place here will be executed every time your command is executed
+  const prompt = await vscode.window.showInputBox({
+    prompt: "Enter your prompt: ",
+  });
+  if (!prompt) {
+    return;
+  }
+
+  console.log(prompt);
+
+  try {
+    const response = await openai.createChatCompletion({
+      model: "gpt-3.5-turbo",
+      messages: [{ role: "user", content: prompt }],
+    });
+    console.log(response);
+    const generatedText = response.data.choices[0].message.content;
+    vscode.window.showInformationMessage(generatedText);
+
+    // Get the active cell
+    const activeCell = vscode.window.activeNotebookEditor?.selection?.active;
+    if (!activeCell) {
+        vscode.window.showErrorMessage('No active cell found.');
+        return;
+    }
+
+    // Get the active notebook URI
+    const notebookUri = notebook.uri;
+
+    // Create a new cell with the selected text
+    const newCell = {
+        cellKind: vscode.CellKind.Code,
+        source: generatedText,
+    };
+
+    // Add the new cell to the active notebook document
+    vscode.workspace.openNotebookDocument(notebookUri).then(notebookDocument => {
+        const edit = new vscode.WorkspaceEdit();
+        const lastCellIndex = notebookDocument.cells.length;
+        edit.replaceNotebookCells(notebookUri, new vscode.NotebookRange(lastCellIndex, lastCellIndex), [newCell]);
+        return vscode.workspace.applyEdit(edit);
+    }).then(success => {
+        if (success) {
+            vscode.window.showInformationMessage('Text pasted to a new cell.');
+        } else {
+            vscode.window.showErrorMessage('Failed to paste text to a new cell.');
+        }
+    }).catch(err => {
+        vscode.window.showErrorMessage('An error occurred while pasting text to a new cell: ' + err);
+    });
+    
+    
+  } catch (error) {
+    console.error(error);
+    vscode.window.showErrorMessage(
+      "An error occurred while generating text."
+    );
+  }
 }
 
 // This method is called when your extension is deactivated
