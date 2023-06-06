@@ -12,10 +12,12 @@
   "activationEvents": [],
   "main": "./extension.js",
   "contributes": {
-    "commands": [{
-      "command": "iai-colab-create.helloWorld",
-      "title": "Hello World"
-    }]
+    "commands": [
+      {
+        "command": "iai-colab-create.askGPT",
+        "title": "Ask GPT"
+      }
+    ]
   },
   "scripts": {
     "lint": "eslint .",
@@ -23,14 +25,23 @@
     "test": "node ./test/runTest.js"
   },
   "devDependencies": {
-    "@types/vscode": "^1.76.0",
     "@types/glob": "^8.1.0",
     "@types/mocha": "^10.0.1",
     "@types/node": "16.x",
+    "@types/vscode": "^1.76.0",
+    "@vscode/test-electron": "^2.3.0",
     "eslint": "^8.36.0",
     "glob": "^8.1.0",
     "mocha": "^10.2.0",
-    "typescript": "^4.9.5",
-    "@vscode/test-electron": "^2.3.0"
+    "typescript": "^4.9.5"
+  },
+  "dependencies": {
+    "@jupyterlab/apputils": "^3.6.3",
+    "@jupyterlab/nbformat": "^3.6.3",
+    "@jupyterlab/services": "^6.6.3",
+    "axios": "^1.3.5",
+    "nbformat": "^0.0.2",
+    "openai": "^3.2.1",
+    "path": "^0.12.7"
   }
 }
