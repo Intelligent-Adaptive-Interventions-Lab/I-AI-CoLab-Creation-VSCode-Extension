@@ -18,11 +18,15 @@ async function activate(context) {
     "iai-colab-create.askGPT",
     async function () {
       let notebook = vscode.window.activeNotebookEditor?.document;
+      console.log(notebook);
       if (!notebook) {
         createNewNotebook()
           .then((newNotebook) => {
             notebook = newNotebook;
-            handleNotebookDocument(notebook);
+            console.log(notebook);
+            vscode.window.showNotebookDocument(notebook).then(() => {
+              handleNotebookDocument(notebook);
+            });
           })
           .catch((err) => {
             vscode.window.showErrorMessage(
@@ -91,43 +95,26 @@ async function handleNotebookDocument(notebook) {
     const generatedText = response.data.choices[0].message.content;
     vscode.window.showInformationMessage(generatedText);
 
-    const activeCell = vscode.window.activeNotebookEditor?.selection?.active;
-    if (!activeCell) {
-      vscode.window.showErrorMessage("No active cell found.");
+    // Get the active notebook editor
+    const activeEditor = vscode.window.activeNotebookEditor;
+    if (!activeEditor) {
+      vscode.window.showErrorMessage("No active notebook editor found.");
       return;
     }
 
-    const notebookUri = notebook.uri;
-    const newCell = {
-      cellKind: vscode.CellKind.Code,
-      source: generatedText,
-      language: "python",
-    };
+    // Create a new cell with the generated text
+    const newCell = new vscode.NotebookCellData(
+      vscode.NotebookCellKind.Code,
+      generatedText,
+      "python"
+    );
 
-    vscode.workspace
-      .openNotebookDocument(notebookUri)
-      .then((notebookDocument) => {
-        const edit = new vscode.WorkspaceEdit();
-        const lastCellIndex = notebookDocument.cells.length;
-        const cellRange = new vscode.NotebookCellRange(
-          lastCellIndex,
-          lastCellIndex
-        );
-        edit.replaceNotebookCells(notebookUri, cellRange, [newCell]);
-        return vscode.workspace.applyEdit(edit);
-      })
-      .then((success) => {
-        if (success) {
-          vscode.window.showInformationMessage("Text pasted to a new cell.");
-        } else {
-          vscode.window.showErrorMessage("Failed to paste text to a new cell.");
-        }
-      })
-      .catch((err) => {
-        vscode.window.showErrorMessage(
-          "An error occurred while pasting text to a new cell: " + err
-        );
-      });
+    activeEditor.notebook.metadata.custom.cells = [
+      ...activeEditor.notebook.metadata.custom.cells,
+      newCell,
+    ];
+
+    vscode.window.showInformationMessage("Text pasted to a new cell.");
   } catch (error) {
     console.error(error);
     vscode.window.showErrorMessage("An error occurred while generating text.");
